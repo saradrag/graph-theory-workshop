@@ -43,20 +43,20 @@ end
 -- If u is adjacent to v, then v is adjacent to u
 lemma adj_symm' (h : G.adj u v) : G.adj v u := 
 begin
-  apply symm,
+  apply G.symm,
   exact h,
 end
 
 -- This is just the same as the last lemma, but in an iff form
-lemma adj_comm' (u v : V) : G.adj u v ↔ G.adj v u := 
+lemma adj_comm' (u v : V) : G.adj u v ↔ G.adj v u :=
 begin
   split,
-  intro h,
-  apply symm,
-  exact h,
-  intro h,
-  apply symm,
-  exact h,
+  {
+    apply adj_symm,
+  },
+  {
+    apply adj_symm,
+  }
 end
 
 -- If two vertices are adjacent, then they're not equal
@@ -73,8 +73,8 @@ lemma ne_of_adj_of_not_adj' {v w x : V} (h : G.adj v x) (hn : ¬ G.adj w x) : v 
 begin
   intro c,
   rw c at h,
-  apply hn,
-  exact h,
+  rw ← and_not_self (G.adj w x),
+  exact ⟨h, hn⟩,
 end
 
 /-!
@@ -84,7 +84,7 @@ See if you can complete the definitions of the complete graph and the empty grap
 def complete_graph' (V : Type u) : simple_graph V := { 
   adj := ne, -- `ne` is "not equal", so the relation is that a pair of vertices
               -- is adjacent if they're not equal
-  symm := 
+  symm :=
     begin
       apply ne.symm,
     end,
@@ -100,11 +100,10 @@ def empty_graph' (V : Type u) : simple_graph V := {
       intros x y h,
       exact h,
     end,
-  loopless :=
+  loopless := 
     begin
-      intros x,
-      intro h,
-      exact h,
+     unfold irreflexive,
+     simp_rw [not_false_iff, implies_true_iff],
     end }
 
 /-!
@@ -124,19 +123,13 @@ instance : has_compl (simple_graph V) := ⟨λ G,
     symm := 
       begin
         intros v w h,
-        split,
-        apply ne.symm,
-        exact h.left,
-        intro h',
-        have h'': G.adj v w,
-        apply G.symm h',
-        contrapose h'',
-        apply h.right,
+        rw ne_comm,
+        rw adj_comm,
+        exact h,
       end,
     loopless := 
       begin
-        intro a,
-        intro c,
+        intros a c,
         apply c.left,
         refl,
       end }⟩
@@ -157,25 +150,37 @@ corresponding element in the edge set of G! (Hint: I've included some helper lem
 
 -- vertices v, w are adjacent iff v is not equal to w and there is an edge in G 
 -- such that v, w ∈ e
+
+
 lemma adj_iff_exists_edge' {v w : V} :
   G.adj v w ↔ v ≠ w ∧ ∃ (e ∈ G.edge_set), v ∈ e ∧ w ∈ e :=
 begin
   split,
-  intro h,
-  split,
-  intro c,
-  rw c at h,
-  apply G.loopless w,
-  exact h,
-  use ⟦(v, w)⟧,
-  split,
-  exact h,
-  split,
-  simp,
-  simp,
-  intro h
-
-  
+  {
+    intro h,
+    split,
+    {
+      intro c,
+      rw c at h,
+      apply G.loopless w,
+      exact h,
+    },
+    {
+      use ⟦(v, w)⟧,
+      split,
+      exact h,
+      simp_rw [sym2.mem_iff],
+      simp,
+    }
+  },
+  {
+    rintros ⟨p, q⟩,
+    rcases q with ⟨e, h, hh⟩,
+    rw sym2.mem_and_mem_iff p at hh,
+    rw ← mem_edge_set,
+    rw hh at h,
+    exact h,
+  }
 
 end
 
@@ -189,13 +194,7 @@ def neighbor_set (v : V) : set V := set_of (G.adj v)
 
 -- a vertex w is in the neighbor set of vertex v iff v and w are adjacent
 lemma mem_neighbor_set' (v w : V) : w ∈ G.neighbor_set v ↔ G.adj v w :=
-begin
-  split,
-  intro h,
-  exact h,
-  intro h,
-  exact h,
-end
+⟨λ h, h, λ h, h⟩ 
 
 /-!
 ```
@@ -213,19 +212,52 @@ end
 -- an edge vw is in the incidence set of v iff v and w are adjacent
 lemma mk_mem_incidence_set_left_iff' : ⟦(v, w)⟧ ∈ G.incidence_set v ↔ G.adj v w :=
 begin
-  sorry,
+  split,
+  {
+    intro h,
+    rw ← mem_edge_set,
+    exact h.1,
+  },
+  {
+    intro h,
+    unfold incidence_set,
+    rw ← mem_edge_set at h,
+    have g:v ∈ ⟦(v,w)⟧,
+    {
+      rw sym2.mem_iff,
+      left,
+      refl,
+    },
+    {
+      rw set.mem_sep_iff,
+      exact ⟨h,g⟩,
+    }
+  }
 end
+
 
 -- an edge vw is in the incidence set of w iff v and w are adjacent
 lemma mk_mem_incidence_set_right_iff' : ⟦(v, w)⟧ ∈ G.incidence_set w ↔ G.adj v w :=
 begin
-  sorry,
+  rw [sym2.eq_swap, adj_comm],
+  apply mk_mem_incidence_set_left_iff,
 end
 
 -- an edge vw is in the incidence set of v iff w is in the neighbor set of v
 lemma mem_incidence_iff_neighbor' {v w : V} : ⟦(v, w)⟧ ∈ G.incidence_set v ↔ w ∈ G.neighbor_set v :=
 begin
-  sorry,
+  split,
+  {
+    rw mk_mem_incidence_set_left_iff,
+    intro h,
+    rw mem_neighbor_set,
+    exact h,
+  },
+  {
+    intro h,
+    rw mk_mem_incidence_set_left_iff,
+    exact h,
+  }
 end
 
 end simple_graph
