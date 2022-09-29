@@ -37,31 +37,44 @@ Let's prove some simple lemmas about it!
 -- v is not adjacent to itself
 lemma irrefl' {v : V} : ¬G.adj v v := 
 begin
-  sorry,
+  apply loopless,
 end
 
 -- If u is adjacent to v, then v is adjacent to u
 lemma adj_symm' (h : G.adj u v) : G.adj v u := 
 begin
-  sorry,
+  apply symm,
+  exact h,
 end
 
 -- This is just the same as the last lemma, but in an iff form
 lemma adj_comm' (u v : V) : G.adj u v ↔ G.adj v u := 
 begin
-  sorry,
+  split,
+  intro h,
+  apply symm,
+  exact h,
+  intro h,
+  apply symm,
+  exact h,
 end
 
 -- If two vertices are adjacent, then they're not equal
 lemma ne_of_adj' (h : G.adj a b) : a ≠ b :=
 begin
-  sorry,
+  intro c,
+  rw c at h,
+  apply G.loopless b,
+  exact h,
 end
 
 -- if v is adjacent to x and w is not adjacent to x, then v ≠ w
 lemma ne_of_adj_of_not_adj' {v w x : V} (h : G.adj v x) (hn : ¬ G.adj w x) : v ≠ w :=
 begin
-  sorry,
+  intro c,
+  rw c at h,
+  apply hn,
+  exact h,
 end
 
 /-!
@@ -73,22 +86,25 @@ def complete_graph' (V : Type u) : simple_graph V := {
               -- is adjacent if they're not equal
   symm := 
     begin
-      sorry,
-    end
+      apply ne.symm,
+    end,
   loopless :=
     begin
-      sorry,
+      apply ne.irrefl,
     end }
 
 def empty_graph' (V : Type u) : simple_graph V := { 
   adj := λ i j, false, -- in other words, for every pair of vertices, adjacency between them is "false"
   symm := 
     begin
-      sorry,
-    end
+      intros x y h,
+      exact h,
+    end,
   loopless :=
     begin
-      sorry,
+      intros x,
+      intro h,
+      exact h,
     end }
 
 /-!
@@ -107,11 +123,22 @@ instance : has_compl (simple_graph V) := ⟨λ G,
                                       -- creating loops in our definition.
     symm := 
       begin
-        sorry,
-      end
+        intros v w h,
+        split,
+        apply ne.symm,
+        exact h.left,
+        intro h',
+        have h'': G.adj v w,
+        apply G.symm h',
+        contrapose h'',
+        apply h.right,
+      end,
     loopless := 
       begin
-        sorry,
+        intro a,
+        intro c,
+        apply c.left,
+        refl,
       end }⟩
 
 
@@ -133,7 +160,23 @@ corresponding element in the edge set of G! (Hint: I've included some helper lem
 lemma adj_iff_exists_edge' {v w : V} :
   G.adj v w ↔ v ≠ w ∧ ∃ (e ∈ G.edge_set), v ∈ e ∧ w ∈ e :=
 begin
-  sorry,
+  split,
+  intro h,
+  split,
+  intro c,
+  rw c at h,
+  apply G.loopless w,
+  exact h,
+  use ⟦(v, w)⟧,
+  split,
+  exact h,
+  split,
+  simp,
+  simp,
+  intro h
+
+  
+
 end
 
 /-!
@@ -147,7 +190,11 @@ def neighbor_set (v : V) : set V := set_of (G.adj v)
 -- a vertex w is in the neighbor set of vertex v iff v and w are adjacent
 lemma mem_neighbor_set' (v w : V) : w ∈ G.neighbor_set v ↔ G.adj v w :=
 begin
-  sorry,
+  split,
+  intro h,
+  exact h,
+  intro h,
+  exact h,
 end
 
 /-!
@@ -159,7 +206,8 @@ def incidence_set (v : V) : set (sym2 V) := {e ∈ G.edge_set | v ∈ e}
 -- the incidence set of a vertex is a subset of the graph's edge set
 lemma incidence_set_subset' (v : V) : G.incidence_set v ⊆ G.edge_set :=
 begin
-  sorry,
+  intros a h,
+  exact h.1,
 end
 
 -- an edge vw is in the incidence set of v iff v and w are adjacent
