@@ -5,6 +5,8 @@ Authors: Alena Gusakov
 -/
 import combinatorics.simple_graph.basic
 import data.set.finite
+import data.set
+import data.nat.basic
 /-!
 # Strongly regular graphs
 
@@ -57,33 +59,39 @@ lemma bot_strongly_regular :
 { card := rfl, -- it's just an easy rfl here
   regular :=
     begin
-      sorry,
+      exact simple_graph.bot_degree,
     end,
   of_adj :=
     begin
-      sorry,
+      intros v w,
+      simp_rw [bot_adj, false_implies_iff],
     end,
   of_not_adj :=
     begin
-      sorry,
+      intros v w h,
+      rwa [bot_adj, not_false_iff, true_implies_iff, fintype.card_eq_zero_iff, common_neighbors_eq, set.is_empty_coe_sort],
+      apply set.inter_empty _,
     end }
+
 
 /-- Complete graphs are strongly regular. Note that `μ` can take any value
   for complete graphs, since there are no distinct pairs of non-adjacent vertices. -/
 lemma is_SRG_with.top :
   (⊤ : simple_graph V).is_SRG_with (fintype.card V) (fintype.card V - 1) (fintype.card V - 2) μ :=
 { card := rfl,
-  regular :=
-    begin
-      sorry,
-    end,
+  regular := complete_graph_degree,
   of_adj :=
     begin
-      sorry,
+      intros v w h,
+      rw card_common_neighbors_top h.ne,
     end,
   of_not_adj :=
     begin
-      sorry,
+      intros v w h c,
+      contrapose c,
+      rw top_adj,
+      push_neg,
+      exact h,
     end }
 
 /-!
@@ -99,7 +107,25 @@ lemma is_SRG_with.card_neighbor_finset_union_eq {v w : V} (h : G.is_SRG_with n k
   (G.neighbor_finset v ∪ G.neighbor_finset w).card =
     2 * k - fintype.card (G.common_neighbors v w) :=
 begin
-  sorry,
+  rw eq_comm,
+  rw nat.sub_eq_iff_eq_add,
+  {
+    unfold common_neighbors,
+    rw ← set.to_finset_card,
+    rw set.to_finset_inter,
+    unfold neighbor_finset,
+    rw finset.card_union_add_card_inter,
+    rwa [set.to_finset_card, set.to_finset_card, card_neighbor_set_eq_degree, card_neighbor_set_eq_degree],
+    have g: G.is_regular_of_degree k := is_SRG_with.regular h,
+    rwa [g v, g w],
+    exact two_mul k,
+  },
+  {
+    calc
+      fintype.card ↥(G.common_neighbors v w) ≤ G.degree v : card_common_neighbors_le_degree_left G _ _
+                                          ...= k : is_SRG_with.regular h v
+                                          ...≤ 2*k : nat.le_mul_of_pos_left (nat.succ_pos 1),
+  }
 end
 
 /-- Assuming `G` is strongly regular, `2*(k + 1) - m` in `G` is the number of vertices that are
@@ -110,14 +136,18 @@ lemma is_SRG_with.card_neighbor_finset_union_of_not_adj {v w : V} (h : G.is_SRG_
   (hne : v ≠ w) (ha : ¬G.adj v w) :
   (G.neighbor_finset v ∪ G.neighbor_finset w).card = 2 * k - μ :=
 begin
-  sorry,
+  have g := is_SRG_with.of_not_adj h v w hne ha,
+  rw ← g,
+  exact h.card_neighbor_finset_union_eq,
 end
 
 lemma is_SRG_with.card_neighbor_finset_union_of_adj {v w : V} (h : G.is_SRG_with n k ℓ μ)
   (ha : G.adj v w) :
   (G.neighbor_finset v ∪ G.neighbor_finset w).card = 2 * k - ℓ :=
 begin
-  sorry,
+  have g := h.of_adj v w ha,
+  rw ← g,
+  exact h.card_neighbor_finset_union_eq,
 end
 
 -- hint: ext is a useful command in this one! whenever you see two sets being equal as your goal,
@@ -126,7 +156,9 @@ lemma compl_neighbor_finset_sdiff_inter_eq {v w : V} :
   (G.neighbor_finset v)ᶜ \ {v} ∩ ((G.neighbor_finset w)ᶜ \ {w}) =
     (G.neighbor_finset v)ᶜ ∩ (G.neighbor_finset w)ᶜ \ ({w} ∪ {v}) :=
 begin
-  sorry,
+  ext,
+  simp_rw [finset.mem_inter, finset.mem_sdiff, finset.mem_inter, finset.mem_union, push_neg.not_or_eq],
+  cc,
 end
 
 /-!
@@ -137,13 +169,42 @@ lemma sdiff_compl_neighbor_finset_inter_eq {v w : V} (h : G.adj v w) :
   (G.neighbor_finset v)ᶜ ∩ (G.neighbor_finset w)ᶜ \ ({w} ∪ {v}) =
     (G.neighbor_finset v)ᶜ ∩ (G.neighbor_finset w)ᶜ :=
 begin
-  sorry,
+  ext,
+  split,
+  {
+    intro h,
+    rw mem_sdiff at h,
+    exact h.left,
+  },
+  {
+    by_contra,
+    push_neg at h,
+    cases h with ha hb,
+    rw mem_sdiff at hb,
+    push_neg at hb,
+    have g:=hb ha,
+    rw mem_inter at ha,
+    cases ha with hav haw,
+    rw mem_union at g,
+    cases g,
+    {
+      rw mem_singleton at g,
+      rw [g, finset.mem_compl, simple_graph.mem_neighbor_finset G v w] at hav,
+      apply absurd h hav, 
+    },
+    {
+      rw mem_singleton at g,
+      rw [g, finset.mem_compl, simple_graph.mem_neighbor_finset G w v] at haw,
+      apply absurd (adj.symm h) haw,                             
+    }
+  }
 end
 
 lemma is_SRG_with.compl_is_regular (h : G.is_SRG_with n k ℓ μ) :
   Gᶜ.is_regular_of_degree (n - k - 1) :=
 begin
-  sorry,
+  intro v,
+  rw [degree_compl, h.regular, h.card, nat.sub.right_comm],
 end
 
 /-!
@@ -154,7 +215,23 @@ lemma is_SRG_with.card_common_neighbors_eq_of_adj_compl (h : G.is_SRG_with n k �
   {v w : V} (ha : Gᶜ.adj v w) :
   fintype.card ↥(Gᶜ.common_neighbors v w) = n - (2 * k - μ) - 2 :=
 begin
-  sorry,
+  unfold common_neighbors,
+  rw ← h.card_neighbor_finset_union_of_not_adj ha.ne (ha.right),
+  symmetry,
+  rw [nat.sub.right_comm, nat.sub_eq_iff_eq_add],
+  {
+    rw [← set.to_finset_card, set.to_finset_inter, ← neighbor_finset, ← neighbor_finset, nat.add_comm],
+    --rw [neighbor_finset_compl, neighbor_finset_compl],
+    rw ← card_union_add_card_inter,
+    rw finset.union_distrib_left,
+    rw finset.union_comm,
+    rw ← finset.union_assoc,
+    --rw neighbor_set_union_compl_neighbor_set_eq,
+    sorry,
+  },
+  {
+    sorry,
+  }
 end
 
 /-!
@@ -173,15 +250,17 @@ lemma is_SRG_with.compl (h : G.is_SRG_with n k ℓ μ) :
 { card := h.card,
   regular :=
     begin
-      sorry,
+      exact h.compl_is_regular,
     end,
   of_adj :=
     begin
-      sorry,
+      intros v w,
+      exact h.card_common_neighbors_eq_of_adj_compl,
     end,
   of_not_adj :=
     begin
-      sorry,
+      intros v w,
+      exact h.card_common_neighbors_eq_of_not_adj_compl,
     end }
 
 end simple_graph
